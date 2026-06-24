@@ -1,77 +1,62 @@
 #!/bin/bash
-# run.sh - یک‌بار نصب، رفع فونت و اجرای ROBOSHΞN™
 
-set -e
+# ==========================================
+# ROBOSHΞN™ - Automated Setup for Termux
+# ==========================================
 
+# رنگ‌ها برای زیباتر شدن خروجی ترمینال
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-echo -e "${GREEN}🤖 ROBOSHΞN™ installation started...${NC}"
+echo -e "${BLUE}======================================${NC}"
+echo -e "${GREEN}   Welcome to ROBOSHΞN™ Installer   ${NC}"
+echo -e "${BLUE}======================================${NC}"
 
-# ===== ۱. نصب پایتون =====
-if ! command -v python3 &>/dev/null; then
-    echo -e "${YELLOW}Installing Python...${NC}"
-    if [ -d "/data/data/com.termux" ]; then
-        pkg install -y python3 python-pip
-    else
-        sudo apt install -y python3 python3-pip
-    fi
-fi
+# ۱. نصب پیش‌نیازهای سیستمی
+echo -e "\n${YELLOW}[1/4] Updating packages and installing dependencies...${NC}"
+pkg update -y && pkg upgrade -y
+pkg install git python curl wget ncurses-utils -y
 
-# ===== ۲. نصب فونت فارسی =====
-echo -e "${YELLOW}Installing Persian font...${NC}"
-if [ -d "/data/data/com.termux" ]; then
-    pkg install -y fontconfig ttf-noto 2>/dev/null || pkg install -y fontconfig noto-fonts 2>/dev/null || true
-    mkdir -p ~/.fonts
-    curl -sL -o ~/.fonts/Vazir.ttf https://github.com/rastikerdar/vazir-font/raw/master/dist/Vazir.ttf
-    fc-cache -fv 2>/dev/null || true
-    if ! grep -q 'export LANG=en_US.UTF-8' ~/.bashrc; then
-        echo 'export LANG=en_US.UTF-8' >> ~/.bashrc
-        echo 'export LC_ALL=en_US.UTF-8' >> ~/.bashrc
-    fi
-    export LANG=en_US.UTF-8
-    export LC_ALL=en_US.UTF-8
+# ۲. تنظیمات فونت فارسی برای ترموکس
+echo -e "\n${YELLOW}[2/4] Setting up Persian font natively for Termux...${NC}"
+mkdir -p ~/.termux
+
+# دانلود مستقیم فونت وزیر در مسیر اختصاصی ترموکس
+echo -e "Downloading Vazir font..."
+curl -sL -o ~/.termux/font.ttf https://github.com/rastikerdar/vazir-font/raw/master/dist/Vazir.ttf
+
+# رفرش کردن تنظیمات ترموکس برای اعمال آنی فونت
+if command -v termux-reload-settings &>/dev/null; then
+    termux-reload-settings
+    echo -e "${GREEN}✔ Font applied successfully!${NC}"
 else
-    sudo apt install -y fonts-noto fontconfig
+    echo -e "${RED}⚠ Could not automatically reload Termux settings. You may need to restart the app.${NC}"
 fi
 
-# ===== ۳. دانلود فایل‌ها =====
-echo -e "${YELLOW}Downloading files...${NC}"
-TMP_DIR=$(mktemp -d)
-cd "$TMP_DIR"
-
-curl -sL -o requirements.txt https://raw.githubusercontent.com/shervinofpersia/Roboshen/main/requirements.txt
-curl -sL -o roboshen.py https://raw.githubusercontent.com/shervinofpersia/Roboshen/main/roboshen.py
-
-# ===== ۴. نصب کتابخانه‌های پایتون =====
-echo -e "${YELLOW}Installing Python packages...${NC}"
-if [ -d "/data/data/com.termux" ]; then
-    python3 -m pip install --break-system-packages -r requirements.txt 2>/dev/null || true
-else
-    pip3 install -r requirements.txt 2>/dev/null || true
-fi
-
-# ===== ۵. نصب اسکریپت =====
-mkdir -p ~/.local/bin
-cp roboshen.py ~/.local/bin/roboshen
-chmod +x ~/.local/bin/roboshen
-
-export PATH="$HOME/.local/bin:$PATH"
-if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' ~/.bashrc 2>/dev/null; then
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-fi
-
-# ===== ۶. پاکسازی =====
+# ۳. دریافت سورس کد پروژه
+echo -e "\n${YELLOW}[3/4] Downloading Roboshen project...${NC}"
 cd ~
-rm -rf "$TMP_DIR"
+if [ -d "Roboshen" ]; then
+    echo -e "Removing old version..."
+    rm -rf Roboshen
+fi
 
-# ===== ۷. اجرا =====
-clear
-echo -e "${GREEN}✅ Installation complete!${NC}"
-echo -e "${GREEN}▶️  ROBOSHΞN™ is starting...${NC}"
-echo -e "${YELLOW}📢 Contact: Telegram @shervini${NC}\n"
-sleep 1
+git clone https://github.com/shervinofpersia/Roboshen.git
+cd Roboshen
 
-~/.local/bin/roboshen
+# ۴. نصب کتابخانه‌های پایتون
+echo -e "\n${YELLOW}[4/4] Installing Python requirements...${NC}"
+# استفاده از --break-system-packages برای دور زدن محدودیت‌های PEP 668 در ترموکس
+pip install -r requirements.txt --break-system-packages
+
+# ۵. پایان و اجرای ربات
+echo -e "\n${BLUE}======================================${NC}"
+echo -e "${GREEN}   Installation Complete! 🎉        ${NC}"
+echo -e "${BLUE}======================================${NC}"
+echo -e "Starting ROBOSHΞN™...\n"
+
+# اجرای مستقیم پایتون
+python roboshen.py
