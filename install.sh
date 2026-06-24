@@ -41,7 +41,16 @@ else
     PIP="pip3"
 fi
 
-# install python packages (without upgrading pip)
+# create temp directory
+TMP_DIR=$(mktemp -d)
+cd "$TMP_DIR"
+
+# download required files from GitHub
+echo -e "${YELLOW}Downloading files from GitHub...${NC}"
+curl -sL -o requirements.txt https://raw.githubusercontent.com/shervinofpersia/Roboshen/main/requirements.txt
+curl -sL -o roboshen.py https://raw.githubusercontent.com/shervinofpersia/Roboshen/main/roboshen.py
+
+# install python packages
 echo -e "${YELLOW}Installing required python packages...${NC}"
 if [ "$IS_TERMUX" = true ]; then
     $PIP install --break-system-packages -r requirements.txt
@@ -75,6 +84,10 @@ if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_CONFIG"
     echo -e "${YELLOW}Added ~/.local/bin to PATH. Please restart terminal or run: source $SHELL_CONFIG${NC}"
 fi
+
+# cleanup
+cd ~
+rm -rf "$TMP_DIR"
 
 echo -e "${GREEN}Installation complete. Run 'roboshen' to start.${NC}"
 echo -e "Contact: Telegram @shervini"
