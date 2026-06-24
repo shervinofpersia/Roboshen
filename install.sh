@@ -6,7 +6,7 @@ set -e
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo -e "${GREEN}🤖 شروع نصب ROBOSHΞN™...${NC}"
 
@@ -15,34 +15,49 @@ if [ -d "/data/data/com.termux" ]; then
     echo -e "${YELLOW}📱 محیط Termux تشخیص داده شد.${NC}"
     PKG_MANAGER="pkg"
     INSTALL_CMD="pkg install -y"
+    IS_TERMUX=true
 else
     echo -e "${YELLOW}🐧 محیط Linux تشخیص داده شد.${NC}"
     PKG_MANAGER="apt"
     INSTALL_CMD="sudo apt install -y"
+    IS_TERMUX=false
 fi
 
-# نصب پایتون و ابزارهای لازم (اگر موجود نباشند)
+# نصب پایتون و ابزارهای لازم
 echo -e "${YELLOW}📦 بررسی و نصب پیش‌نیازهای سیستمی...${NC}"
 if ! command -v python3 &> /dev/null; then
     echo -e "${YELLOW}پایتون ۳ یافت نشد. در حال نصب...${NC}"
-    $INSTALL_CMD python3 python3-pip
+    $INSTALL_CMD python3
 fi
 
-if ! command -v pip3 &> /dev/null; then
-    echo -e "${YELLOW}pip3 یافت نشد. در حال نصب...${NC}"
-    $INSTALL_CMD python3-pip
+# در Termux، پایتون به همراه pip نصب می‌شود
+if [ "$IS_TERMUX" = true ]; then
+    # اطمینان از نصب python-pip
+    if ! command -v pip &> /dev/null; then
+        echo -e "${YELLOW}نصب python-pip...${NC}"
+        $INSTALL_CMD python-pip
+    fi
+else
+    if ! command -v pip3 &> /dev/null; then
+        echo -e "${YELLOW}نصب pip3...${NC}"
+        $INSTALL_CMD python3-pip
+    fi
 fi
 
 # نصب کتابخانه‌های پایتون از requirements.txt
 echo -e "${YELLOW}📚 نصب کتابخانه‌های پایتون...${NC}"
-pip3 install --upgrade pip
-pip3 install -r requirements.txt
+if [ "$IS_TERMUX" = true ]; then
+    # در Termux از --break-system-packages استفاده می‌کنیم
+    python3 -m pip install --break-system-packages -r requirements.txt
+else
+    pip3 install -r requirements.txt
+fi
 
 # نصب فونت فارسی (فقط در صورتی که نصب نباشه)
 echo -e "${YELLOW}🖋️ بررسی فونت فارسی...${NC}"
 if ! fc-list :lang=fa | grep -q .; then
     echo -e "${YELLOW}فونت فارسی یافت نشد. در حال نصب...${NC}"
-    if [ -d "/data/data/com.termux" ]; then
+    if [ "$IS_TERMUX" = true ]; then
         $INSTALL_CMD fontconfig noto-fonts
     else
         $INSTALL_CMD fonts-noto fontconfig
