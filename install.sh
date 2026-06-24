@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh – نصب خودکار ROBOSHΞN™
+# install.sh - ROBOSHΞN™ auto installer for Termux/Linux
 
 set -e
 
@@ -8,81 +8,73 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${GREEN}🤖 شروع نصب ROBOSHΞN™...${NC}"
+echo -e "${GREEN}ROBOSHΞN™ installation started...${NC}"
 
-# تشخیص محیط (Termux یا Linux معمولی)
+# detect environment
 if [ -d "/data/data/com.termux" ]; then
-    echo -e "${YELLOW}📱 محیط Termux تشخیص داده شد.${NC}"
-    PKG_MANAGER="pkg"
-    INSTALL_CMD="pkg install -y"
     IS_TERMUX=true
+    PKG_CMD="pkg install -y"
 else
-    echo -e "${YELLOW}🐧 محیط Linux تشخیص داده شد.${NC}"
-    PKG_MANAGER="apt"
-    INSTALL_CMD="sudo apt install -y"
     IS_TERMUX=false
+    PKG_CMD="sudo apt install -y"
 fi
 
-# نصب پایتون و ابزارهای لازم
-echo -e "${YELLOW}📦 بررسی و نصب پیش‌نیازهای سیستمی...${NC}"
-if ! command -v python3 &> /dev/null; then
-    echo -e "${YELLOW}پایتون ۳ یافت نشد. در حال نصب...${NC}"
-    $INSTALL_CMD python3
+# install python & pip if missing
+if ! command -v python3 &>/dev/null; then
+    echo -e "${YELLOW}Installing python3...${NC}"
+    $PKG_CMD python3
 fi
 
-# در Termux، پایتون به همراه pip نصب می‌شود
 if [ "$IS_TERMUX" = true ]; then
-    # اطمینان از نصب python-pip
-    if ! command -v pip &> /dev/null; then
-        echo -e "${YELLOW}نصب python-pip...${NC}"
-        $INSTALL_CMD python-pip
+    if ! command -v pip &>/dev/null; then
+        echo -e "${YELLOW}Installing python-pip...${NC}"
+        $PKG_CMD python-pip
     fi
+    PYTHON="python3"
+    PIP="$PYTHON -m pip"
 else
-    if ! command -v pip3 &> /dev/null; then
-        echo -e "${YELLOW}نصب pip3...${NC}"
-        $INSTALL_CMD python3-pip
+    if ! command -v pip3 &>/dev/null; then
+        echo -e "${YELLOW}Installing pip3...${NC}"
+        $PKG_CMD python3-pip
     fi
+    PYTHON="python3"
+    PIP="pip3"
 fi
 
-# نصب کتابخانه‌های پایتون از requirements.txt
-echo -e "${YELLOW}📚 نصب کتابخانه‌های پایتون...${NC}"
+# install python packages (without upgrading pip)
+echo -e "${YELLOW}Installing required python packages...${NC}"
 if [ "$IS_TERMUX" = true ]; then
-    # در Termux از --break-system-packages استفاده می‌کنیم
-    python3 -m pip install --break-system-packages -r requirements.txt
+    $PIP install --break-system-packages -r requirements.txt
 else
-    pip3 install -r requirements.txt
+    $PIP install -r requirements.txt
 fi
 
-# نصب فونت فارسی (فقط در صورتی که نصب نباشه)
-echo -e "${YELLOW}🖋️ بررسی فونت فارسی...${NC}"
+# install persian font if missing
+echo -e "${YELLOW}Checking Persian font...${NC}"
 if ! fc-list :lang=fa | grep -q .; then
-    echo -e "${YELLOW}فونت فارسی یافت نشد. در حال نصب...${NC}"
+    echo -e "${YELLOW}Installing font...${NC}"
     if [ "$IS_TERMUX" = true ]; then
-        $INSTALL_CMD fontconfig noto-fonts
+        $PKG_CMD fontconfig noto-fonts
     else
-        $INSTALL_CMD fonts-noto fontconfig
+        $PKG_CMD fonts-noto fontconfig
     fi
 else
-    echo -e "${GREEN}✅ فونت فارسی موجود است.${NC}"
+    echo -e "${GREEN}Font already installed.${NC}"
 fi
 
-# نصب اسکریپت اصلی در مسیر PATH
+# install script to ~/.local/bin
 TARGET_DIR="$HOME/.local/bin"
 mkdir -p "$TARGET_DIR"
 cp roboshen.py "$TARGET_DIR/roboshen"
 chmod +x "$TARGET_DIR/roboshen"
 
-# افزودن به PATH اگر قبلاً اضافه نشده
+# add to PATH if needed
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     SHELL_CONFIG="$HOME/.bashrc"
-    if [ -f "$HOME/.zshrc" ]; then
-        SHELL_CONFIG="$HOME/.zshrc"
-    fi
+    [ -f "$HOME/.zshrc" ] && SHELL_CONFIG="$HOME/.zshrc"
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_CONFIG"
-    echo -e "${YELLOW}⚠️ مسیر $HOME/.local/bin به PATH اضافه شد. لطفاً ترمینال را مجدداً باز کنید یا دستور زیر را اجرا کنید:${NC}"
-    echo -e "   ${GREEN}source $SHELL_CONFIG${NC}"
+    echo -e "${YELLOW}Added ~/.local/bin to PATH. Please restart terminal or run: source $SHELL_CONFIG${NC}"
 fi
 
-echo -e "${GREEN}✅ نصب ROBOSHΞN™ با موفقیت انجام شد.${NC}"
-echo -e "💡 حالا با دستور ${GREEN}roboshen${NC} می‌توانید آن را اجرا کنید."
-echo -e "📢 برای ارتباط با سازنده: ${GREEN}Telegram @shervini${NC}"
+echo -e "${GREEN}Installation complete. Run 'roboshen' to start.${NC}"
+echo -e "Contact: Telegram @shervini"
