@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# roboshen - ROBOSHΞN™ Terminal AI Agent
+# roboshen - ROBOSHΞN™ Terminal AI Agent with full Persian support
 
 import os
 import sys
@@ -14,50 +14,50 @@ from rich.text import Text
 from rich import box
 from time import sleep
 
-# ===== SYSTEM PROMPT (English instructions, Pinglish output) =====
+# ===== Persian text fixer =====
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    PERSIAN_SUPPORT = True
+except ImportError:
+    PERSIAN_SUPPORT = False
+    print("Warning: Install arabic_reshaper and python-bidi for Persian support.")
+
+def fix_persian_text(text):
+    """Fix Persian text for terminal display (reshape + bidi)"""
+    if not PERSIAN_SUPPORT:
+        return text
+    try:
+        reshaped = arabic_reshaper.reshape(text)
+        return get_display(reshaped)
+    except:
+        return text
+
+# ===== SYSTEM PROMPT =====
 SYSTEM_PROMPT = """You are ROBOSHΞN™, an AI assistant running in a terminal (Termux/Linux).
 Creator: Shervin Nouri
 Contact: Telegram @shervini (https://t.me/shervini)
 
-IMPORTANT RULES:
-1. LANGUAGE:
+RULES:
+1. Language:
    - If user writes in English → respond in English.
-   - If user writes in Persian (Farsi) or Pinglish (Farsi using Latin letters) → respond in Pinglish (Farsi with Latin letters).
-   - attention: NEVER use Persian/Arabic characters or script in your responses (use only Latin letters for Farsi).
+   - If user writes in Persian (Farsi) → respond in Persian (with Persian script).
+   - If user writes in Pinglish (Farsi using Latin letters) → respond in Pinglish.
+2. Introduction:
+   - ONLY introduce yourself in the FIRST message.
+   - DO NOT reintroduce yourself in every response.
+   - No greetings like "Salam!" every time, just be direct.
+3. Behavior:
+   - Be friendly, accurate, and helpful.
+   - Give step-by-step answers for technical questions.
+   - Avoid slang but be warm.
 
-2. INTRODUCTION:
-   - ONLY introduce yourself (as ROBOSHΞN™) in the VERY FIRST message of the conversation.
-   - After that, DO NOT reintroduce yourself in every response. Just give the answer directly.
-   - No greetings like "Salam!" or "Hello!" in every message. Just be direct and helpful.
-
-3. BEHAVIOR:
-   - Be friendly, accurate, and creative.
-   - If user asks technical questions, give step-by-step complete answers.
-   - If question is off-topic, politely guide them.
-   - Avoid slang or overly casual language, but be warm and natural.
-   - If needed, give useful suggestions for improving terminal work.
-
-4. FORMAT:
-   - Keep responses clear and readable.
-   - Use simple formatting (no markdown if not needed).
-   - If listing steps, use numbers or bullet points with "-".
-
-Remember: You are an AI agent. Respond in Pinglish (Farsi with Latin letters) unless user writes in English, then respond in English. Never use Persian script."""
+IMPORTANT: Since the terminal now supports Persian text (using arabic_reshaper), you can respond in Persian script when user writes in Farsi."""
 MODEL = "openai-fast"
 API_URL = "https://text.pollinations.ai/openai"
 MAX_HISTORY = 20
 
 console = Console()
-
-# ===== check font =====
-def check_font_persian():
-    try:
-        result = subprocess.run(["fc-list", ":lang=fa"], capture_output=True, text=True, timeout=5)
-        if result.stdout.strip():
-            return True
-    except:
-        pass
-    return False
 
 # ===== Chat Session =====
 class ChatSession:
@@ -125,8 +125,9 @@ def call_api(messages, retry=0):
 
 # ===== Main =====
 def main():
-    if not check_font_persian():
-        console.print("[yellow]Warning: Persian font not found. Some characters may not display correctly.[/yellow]")
+    if not PERSIAN_SUPPORT:
+        console.print("[yellow]⚠️  Install arabic_reshaper and python-bidi for better Persian support.[/yellow]")
+        console.print("[yellow]Run: pip install arabic_reshaper python-bidi[/yellow]\n")
 
     chat = ChatSession()
     console.clear()
@@ -177,9 +178,12 @@ def main():
 
         chat.add_assistant_message(reply)
 
+        # Fix Persian text before displaying
+        fixed_reply = fix_persian_text(reply)
+
         console.rule(style="dim")
         console.print(Panel(
-            Markdown(reply),
+            Markdown(fixed_reply),
             title="🤖 ROBOSHΞN™",
             border_style="magenta",
             box=box.ROUNDED,
