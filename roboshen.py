@@ -1,197 +1,136 @@
-#!/usr/bin/env python3
-# roboshen - ROBOSHΞN™ Terminal AI Agent with full Persian support
-
 import os
-import sys
 import json
-import subprocess
 import requests
+import arabic_reshaper
+from bidi.algorithm import get_display
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.prompt import Prompt
-from rich.text import Text
-from rich import box
-from time import sleep
 
-# ===== Persian text fixer =====
-try:
-    import arabic_reshaper
-    from bidi.algorithm import get_display
-    PERSIAN_SUPPORT = True
-except ImportError:
-    PERSIAN_SUPPORT = False
-    print("Warning: Install arabic_reshaper and python-bidi for Persian support.")
-
-def fix_persian_text(text):
-    """Fix Persian text for terminal display (reshape + bidi)"""
-    if not PERSIAN_SUPPORT:
-        return text
-    try:
-        reshaped = arabic_reshaper.reshape(text)
-        return get_display(reshaped)
-    except:
-        return text
-
-# ===== SYSTEM PROMPT =====
-SYSTEM_PROMPT = """You are ROBOSHΞN™, an AI assistant running in a terminal (Termux/Linux).
-Creator: Shervin Nouri
-Contact: Telegram @shervini (https://t.me/shervini)
-
-RULES:
-1. Language:
-   - If user writes in English → respond in English.
-   - If user writes in Persian (Farsi) → respond in Persian (with Persian script).
-   - If user writes in Pinglish (Farsi using Latin letters) → respond in Pinglish.
-2. Introduction:
-   - ONLY introduce yourself in the FIRST message.
-   - DO NOT reintroduce yourself in every response.
-   - No greetings like "Salam!" every time, just be direct.
-3. Behavior:
-   - Be friendly, accurate, and helpful.
-   - Give step-by-step answers for technical questions.
-   - Avoid slang but be warm.
-
-IMPORTANT: Since the terminal now supports Persian text (using arabic_reshaper), you can respond in Persian script when user writes in Farsi."""
-MODEL = "openai-fast"
-API_URL = "https://text.pollinations.ai/openai"
-MAX_HISTORY = 20
-
+# تنظیمات اولیه
 console = Console()
+HISTORY_FILE = os.path.expanduser("~/.roboshen_history.json")
+API_URL = "https://text.pollinations.ai/openai"
 
-# ===== Chat Session =====
-class ChatSession:
-    def __init__(self):
-        self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        self.history_file = os.path.expanduser("~/.roboshen_history.json")
-        self.load_history()
-        self.first_message = True
-
-    def load_history(self):
-        if os.path.exists(self.history_file):
-            try:
-                with open(self.history_file, "r") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        self.messages = [self.messages[0]] + data[-MAX_HISTORY:]
-            except:
-                pass
-
-    def save_history(self):
+def load_history():
+    """بارگذاری تاریخچه چت از فایل (حداکثر ۲۰ پیام آخر)"""
+    if os.path.exists(HISTORY_FILE):
         try:
-            with open(self.history_file, "w") as f:
-                json.dump(self.messages[1:], f, ensure_ascii=False, indent=2)
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
         except:
-            pass
+            return []
+    return []
 
-    def add_user_message(self, text):
-        self.messages.append({"role": "user", "content": text})
-        self.save_history()
-
-    def add_assistant_message(self, text):
-        self.messages.append({"role": "assistant", "content": text})
-        self.save_history()
-
-    def get_recent_messages(self):
-        return [self.messages[0]] + self.messages[-10:]
-
-    def clear_history(self):
-        self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        self.first_message = True
-        if os.path.exists(self.history_file):
-            os.remove(self.history_file)
-
-# ===== Call API =====
-def call_api(messages, retry=0):
+def save_history(history):
+    """ذخیره تاریخچه چت در فایل"""
+    # نگه‌داشتن فقط ۲۰ پیام آخر برای جلوگیری از سنگین شدن ریکوئست
+    history = history[-20:]
     try:
-        response = requests.post(
-            API_URL,
-            json={"model": MODEL, "messages": messages, "private": True},
-            timeout=45
-        )
-        if response.status_code == 429 and retry < 2:
-            console.print("[yellow]Rate limit, waiting...[/yellow]")
-            sleep(4)
-            return call_api(messages, retry+1)
-        if response.status_code != 200:
-            return None, f"HTTP {response.status_code}: {response.text[:200]}"
-        data = response.json()
-        reply = data.get("choices", [{}])[0].get("message", {}).get("content")
-        if reply is None:
-            return None, "No content in response."
-        return reply, None
-    except Exception as e:
-        return None, str(e)
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
-# ===== Main =====
+def format_persian(text):
+    """اصلاح جهت و چسباندن حروف فارسی برای ترمینال"""
+    try:
+        # چسباندن حروف فارسی
+        reshaped_text = arabic_reshaper.reshape(text)
+        # راست‌چین کردن
+        bidi_text = get_display(reshaped_text)
+        return bidi_text
+    except Exception:
+        return text
+
+def show_header():
+    """نمایش هدر و اطلاعات ربات در یک پنل زیبا"""
+    os.system('clear' if os.name == 'posix' else 'cls')
+    header_text = "[bold cyan]🤖 ROBOSHΞN™ — Terminal AI Agent[/bold cyan]\n"
+    header_text += "[yellow]by Shervin Nouri | Telegram: @shervini[/yellow]\n\n"
+    header_text += "[white]Commands: exit, /clear, /help[/white]"
+    # پنل فقط برای بخش انگلیسی و هدر استفاده می‌شود
+    console.print(Panel(header_text, border_style="blue", expand=False))
+
 def main():
-    if not PERSIAN_SUPPORT:
-        console.print("[yellow]⚠️  Install arabic_reshaper and python-bidi for better Persian support.[/yellow]")
-        console.print("[yellow]Run: pip install arabic_reshaper python-bidi[/yellow]\n")
-
-    chat = ChatSession()
-    console.clear()
-
-    header = Panel(
-        Text("🤖 ROBOSHΞN™ — Terminal AI Agent", style="bold cyan"),
-        subtitle=Text("by Shervin Nouri | Telegram: @shervini", style="dim"),
-        border_style="bright_blue",
-        box=box.HEAVY,
-        padding=(1, 2)
-    )
-    console.print(header)
-    console.print("[dim]Commands: exit, /clear, /help[/dim]\n")
+    show_header()
+    history = load_history()
 
     while True:
         try:
-            user_input = Prompt.ask("\n[bold green]You[/bold green]")
-        except (KeyboardInterrupt, EOFError):
-            console.print("\n[red]Exit.[/red]")
+            print("\n")
+            # دریافت پیام کاربر
+            user_input = input("You: ").strip()
+            
+            if not user_input:
+                continue
+                
+            # بررسی دستورات سیستمی
+            if user_input.lower() in ['exit', 'quit']:
+                console.print("\n[yellow]خداحافظ! 👋[/yellow]\n")
+                break
+                
+            if user_input.lower() == '/clear':
+                history = []
+                save_history(history)
+                show_header()
+                console.print(format_persian("[green]تاریخچه چت پاک شد.[/green]"))
+                continue
+                
+            if user_input.lower() == '/help':
+                help_text = "دستورات راهنما:\nexit : خروج از برنامه\n/clear : پاک کردن حافظه و تاریخچه ربات"
+                print("\n╭── 🤖 ROBOSHΞN ──")
+                print(format_persian(help_text))
+                print("╰" + "─" * 60)
+                continue
+
+            # اضافه کردن پیام کاربر به تاریخچه
+            history.append({"role": "user", "content": user_input})
+
+            # آماده‌سازی دیتا برای ارسال به API رایگان
+            payload = {
+                "messages": history,
+                "model": "openai"
+            }
+
+            console.print("[dim]در حال فکر کردن...[/dim]", end="\r")
+            
+            # ارسال درخواست به API
+            response = requests.post(API_URL, json=payload)
+            
+            if response.status_code == 200:
+                # پاک کردن متن "در حال فکر کردن..."
+                print("\r" + " " * 30 + "\r", end="")
+                
+                bot_reply = response.text
+                
+                # تلاش برای استخراج متن در صورتی که خروجی JSON باشد
+                try:
+                    reply_json = response.json()
+                    if "choices" in reply_json:
+                        bot_reply = reply_json["choices"][0]["message"]["content"]
+                except ValueError:
+                    pass # اگر خروجی مستقیماً متن بود (Plain Text)
+                    
+                # اضافه کردن جواب به تاریخچه و ذخیره آن
+                history.append({"role": "assistant", "content": bot_reply})
+                save_history(history)
+                
+                # چاپ جواب ربات (بدون کادر گرافیکی برای جلوگیری از به هم ریختگی فارسی)
+                print("╭── 🤖 ROBOSHΞN ──")
+                console.print(format_persian(bot_reply), style="bold cyan")
+                print("╰" + "─" * 60)
+
+            else:
+                print("\r" + " " * 30 + "\r", end="")
+                error_msg = f"خطا در ارتباط با سرور: {response.status_code}"
+                console.print(format_persian(error_msg), style="bold red")
+
+        except KeyboardInterrupt:
+            console.print("\n[yellow]خداحافظ! 👋[/yellow]\n")
             break
-
-        if not user_input:
-            continue
-
-        if user_input.lower() in ("exit", "quit"):
-            break
-        elif user_input.strip() == "/clear":
-            chat.clear_history()
-            console.print("[yellow]History cleared.[/yellow]")
-            continue
-        elif user_input.strip() == "/help":
-            console.print(Panel(
-                "Commands:\n  exit / quit  - exit program\n  /clear       - clear chat history\n  /help        - show this help",
-                title="Help",
-                border_style="green"
-            ))
-            continue
-
-        chat.add_user_message(user_input)
-
-        with console.status("[bold yellow]ROBOSHΞN™ thinking...[/bold yellow]"):
-            reply, error = call_api(chat.get_recent_messages())
-
-        if error:
-            console.print(f"[red]Error: {error}[/red]")
-            chat.messages.pop()
-            continue
-
-        chat.add_assistant_message(reply)
-
-        # Fix Persian text before displaying
-        fixed_reply = fix_persian_text(reply)
-
-        console.rule(style="dim")
-        console.print(Panel(
-            Markdown(fixed_reply),
-            title="🤖 ROBOSHΞN™",
-            border_style="magenta",
-            box=box.ROUNDED,
-            padding=(1, 2)
-        ))
-        console.rule(style="dim")
-
-    console.print("\n[green]Goodbye![/green]")
+        except Exception as e:
+            print("\r" + " " * 30 + "\r", end="")
+            console.print(f"\n[bold red]یک خطای غیرمنتظره رخ داد: {e}[/bold red]\n")
 
 if __name__ == "__main__":
     main()
