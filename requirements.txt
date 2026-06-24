@@ -1,4 +1,4 @@
 requests>=2.28.0
 rich>=13.0.0
 arabic-reshaper>=2.1.0
-python-bidi>=0.4.2
+python-bidi==0.4.2
