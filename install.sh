@@ -58,12 +58,21 @@ else
     $PIP install -r requirements.txt
 fi
 
-# install persian font if missing
+# install persian font if missing (with fallback for Termux)
 echo -e "${YELLOW}Checking Persian font...${NC}"
 if ! fc-list :lang=fa | grep -q .; then
-    echo -e "${YELLOW}Installing font...${NC}"
+    echo -e "${YELLOW}Persian font not found. Attempting to install...${NC}"
     if [ "$IS_TERMUX" = true ]; then
-        $PKG_CMD fontconfig noto-fonts
+        # Try different possible package names in Termux
+        if pkg show ttf-noto &>/dev/null; then
+            $PKG_CMD ttf-noto
+        elif pkg show noto-fonts &>/dev/null; then
+            $PKG_CMD noto-fonts
+        else
+            echo -e "${YELLOW}No font package available. Installing fontconfig only.${NC}"
+            $PKG_CMD fontconfig
+            echo -e "${YELLOW}You may need to install a Persian font manually.${NC}"
+        fi
     else
         $PKG_CMD fonts-noto fontconfig
     fi
