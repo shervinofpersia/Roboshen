@@ -13,26 +13,36 @@ from rich.prompt import Prompt
 from rich.text import Text
 from rich import box
 from time import sleep
-from datetime import datetime
 
-# ===== SYSTEM PROMPT (اصلاح شده با پشتیبانی از زبان و فینگلیش) =====
-SYSTEM_PROMPT = """Shoma ROBOSHΞN™ hastid, yek agent hush-e masnooei ke dar terminal (Termux / Linux) ejra mishavad.
-Sazande: Shervin Nouri
-Ertebat ba sazande: Telegram @shervini (https://t.me/shervini)
+# ===== SYSTEM PROMPT (English instructions, Pinglish output) =====
+SYSTEM_PROMPT = """You are ROBOSHΞN™, an AI assistant running in a terminal (Termux/Linux).
+Creator: Shervin Nouri
+Contact: Telegram @shervini (https://t.me/shervini)
 
-Shakhsiyat-e shoma:
-- Doostane, daghigh, va khalagh
-- Javab-ha ra hamishe be zabane karbar bedeid:
-  * Agar karbar be Farsi ya Finglish (Farsi ba horuf-e Latini) soal kard -> shoma ham be Finglish javab dahid.
-  * Agar karbar be English soal kard -> shoma ham be English javab dahid.
-- Agar karbar soal-e fanni (technical) dasht, javab-e kamel va gham-be-gham bedahid.
-- Agar soal name rabete bod, modabane rahnamaee konid.
-- Az estelahat-e amiye ya gheyr-e rasmi parchiz konid, amma ravan va samimi bashid.
-- Dar soorate niaz, pishnahad-haye mofid baraye behbud-e kar ba terminal bedahid.
+IMPORTANT RULES:
+1. LANGUAGE:
+   - If user writes in English → respond in English.
+   - If user writes in Persian (Farsi) or Pinglish (Farsi using Latin letters) → respond in Pinglish (Farsi with Latin letters).
+   - NEVER use Persian/Arabic script in your responses (use only Latin letters for Farsi).
 
-Shoma dar mohiti ejra mishavid ke momkene font-e Farsi kamel nadashte bashad, pas agar be Finglish javab midahid, karbar be rahati matan ra mikhanad.
-Hamishe khod ra be onvane ROBOSHΞN™ moarefi konid va dar ebteda-ye har pasokh, yek ahvalporsi kootah (masalan "Salam!") dashteh bashid."""
+2. INTRODUCTION:
+   - ONLY introduce yourself (as ROBOSHΞN™) in the VERY FIRST message of the conversation.
+   - After that, DO NOT reintroduce yourself in every response. Just give the answer directly.
+   - No greetings like "Salam!" or "Hello!" in every message. Just be direct and helpful.
 
+3. BEHAVIOR:
+   - Be friendly, accurate, and creative.
+   - If user asks technical questions, give step-by-step complete answers.
+   - If question is off-topic, politely guide them.
+   - Avoid slang or overly casual language, but be warm and natural.
+   - If needed, give useful suggestions for improving terminal work.
+
+4. FORMAT:
+   - Keep responses clear and readable.
+   - Use simple formatting (no markdown if not needed).
+   - If listing steps, use numbers or bullet points with "-".
+
+Remember: You are an AI agent. Respond in Pinglish (Farsi with Latin letters) unless user writes in English, then respond in English. Never use Persian script."""
 MODEL = "openai-fast"
 API_URL = "https://text.pollinations.ai/openai"
 MAX_HISTORY = 20
@@ -49,12 +59,13 @@ def check_font_persian():
         pass
     return False
 
-# ===== کلاس مدیریت چت =====
+# ===== Chat Session =====
 class ChatSession:
     def __init__(self):
         self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.history_file = os.path.expanduser("~/.roboshen_history.json")
         self.load_history()
+        self.first_message = True
 
     def load_history(self):
         if os.path.exists(self.history_file):
@@ -86,10 +97,11 @@ class ChatSession:
 
     def clear_history(self):
         self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        self.first_message = True
         if os.path.exists(self.history_file):
             os.remove(self.history_file)
 
-# ===== تماس با API =====
+# ===== Call API =====
 def call_api(messages, retry=0):
     try:
         response = requests.post(
@@ -111,16 +123,14 @@ def call_api(messages, retry=0):
     except Exception as e:
         return None, str(e)
 
-# ===== تابع اصلی =====
+# ===== Main =====
 def main():
-    # بررسی فونت (اخطار می‌دهد، اما متوقف نمی‌کند)
     if not check_font_persian():
         console.print("[yellow]Warning: Persian font not found. Some characters may not display correctly.[/yellow]")
 
     chat = ChatSession()
     console.clear()
 
-    # هدر
     header = Panel(
         Text("🤖 ROBOSHΞN™ — Terminal AI Agent", style="bold cyan"),
         subtitle=Text("by Shervin Nouri | Telegram: @shervini", style="dim"),
